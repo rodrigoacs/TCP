@@ -77,7 +77,7 @@ public class ClientHandler implements Runnable {
 
   public String getClientInfo() {
     return clientNumber + ":" + clientName;
-    //return clientName + "(" + clientNumber + ")";
+    // return clientName + "(" + clientNumber + ")";
   }
 
   public String getClientName() {
