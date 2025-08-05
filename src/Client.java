@@ -3,6 +3,7 @@
 import com.googlecode.lanterna.TerminalSize;
 import com.googlecode.lanterna.TextColor;
 import com.googlecode.lanterna.gui2.*;
+import com.googlecode.lanterna.gui2.dialogs.MessageDialog;
 import com.googlecode.lanterna.gui2.dialogs.TextInputDialogBuilder;
 import com.googlecode.lanterna.screen.Screen;
 import com.googlecode.lanterna.screen.TerminalScreen;
@@ -173,29 +174,48 @@ public class Client {
         usersListBox.addItem(contacts.get(key),
             () -> {
               selectedContactNumber = (String) contacts.keySet().toArray()[usersListBox.getSelectedIndex()];
-              chatLabel.setText("Mensagem > " + key);
+              chatLabel.setText("Mensagem > " + contacts.get(key));
             });
       }
     }
 
+    private void processServerMessage(String msg) {
+      gui.getGUIThread().invokeLater(() -> {
+        if (msg.startsWith("UPDATE_USERS:")) {
+          updateContacts(msg);
+          updateUserList();
+        } else {
+          messagesListBox.addItem(msg, null);
+          messagesListBox.setSelectedIndex(messagesListBox.getItemCount() - 1);
+        }
+      });
+    }
+
     @Override
     public void run() {
-
       try {
-        String serverMessage;
-        while ((serverMessage = in.readLine()) != null) {
-          final String msg = serverMessage;
+        String firstMessage = in.readLine();
+        if (firstMessage == null) {
+          gui.getGUIThread()
+              .invokeLater(() -> messagesListBox.addItem("[SISTEMA] Falha na conexão com o servidor.", null));
+          return;
+        }
 
+        if ("ERROR:NUMBER_TAKEN".equals(firstMessage)) {
           gui.getGUIThread().invokeLater(() -> {
-
-            if (msg.startsWith("UPDATE_USERS:")) {
-              updateContacts(msg);
-              updateUserList();
-            } else {
-              messagesListBox.addItem(msg, null);
-              messagesListBox.setSelectedIndex(messagesListBox.getItemCount() - 1);
+            MessageDialog.showMessageDialog(gui, "Erro", "O número de usuário já está em uso.");
+            if (!gui.getWindows().isEmpty()) {
+              gui.getWindows().iterator().next().close();
             }
           });
+          return;
+        }
+
+        processServerMessage(firstMessage);
+
+        String serverMessage;
+        while ((serverMessage = in.readLine()) != null) {
+          processServerMessage(serverMessage);
         }
       } catch (IOException e) {
         gui.getGUIThread()

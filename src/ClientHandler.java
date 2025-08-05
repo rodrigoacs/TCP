@@ -29,7 +29,17 @@ public class ClientHandler implements Runnable {
       String registrationLine = in.readLine(); // Formato esperado: "REGISTER:numero:nome"
       String[] parts = registrationLine.split(":", 3);
       if (parts.length == 3 && "REGISTER".equals(parts[0])) {
-        this.clientNumber = parts[1];
+        String numberToCheck = parts[1];
+
+        if (server.isClientNumberTaken(numberToCheck)) {
+          sendMessage("ERROR:NUMBER_TAKEN");
+          System.out
+              .println("Falha no registro: Cliente com número " + numberToCheck + " já existe. Fechando conexão.");
+          return;
+        }
+
+        this.clientNumber = numberToCheck;
+
         this.clientName = parts[2];
         server.addClient(clientNumber, this);
         System.out.println("Cliente " + getClientInfo() + " registrado.");
@@ -77,7 +87,7 @@ public class ClientHandler implements Runnable {
 
   public String getClientInfo() {
     return clientNumber + ":" + clientName;
-    //return clientName + "(" + clientNumber + ")";
+    // return clientName + "(" + clientNumber + ")";
   }
 
   public String getClientName() {

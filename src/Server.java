@@ -52,6 +52,10 @@ public class Server {
     return false;
   }
 
+  public boolean isClientNumberTaken(String clientNumber) {
+    return clients.containsKey(clientNumber);
+  }
+
   // Adiciona um novo cliente à lista e notifica a todos.
   public void addClient(String clientNumber, ClientHandler handler) {
     clients.put(clientNumber, handler);
