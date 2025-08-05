@@ -13,6 +13,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.regex.Pattern;
 
 public class Client {
@@ -21,8 +22,17 @@ public class Client {
   private static MultiWindowTextGUI gui;
   private static ActionListBox messagesListBox;
   private static ActionListBox usersListBox;
+  private static Label chatLabel;
+  private static HashMap<String, String> contacts;
+
+  private static String selectedContactNumber = "0";
+  private static String userName;
+  private static String userNumber;
 
   public static void main(String[] args) throws IOException {
+
+    contacts = new HashMap<String, String>();
+
     // --- Configuração Inicial (sem alterações) ---
     DefaultTerminalFactory terminalFactory = new DefaultTerminalFactory();
     Screen screen = null;
@@ -32,16 +42,19 @@ public class Client {
 
       gui = new MultiWindowTextGUI(screen, new DefaultWindowManager(), new EmptySpace(TextColor.ANSI.BLUE));
 
-      String serverIp = new TextInputDialogBuilder().setTitle("IP do Servidor")
-          .setDescription("Digite o IP do servidor (ex: localhost)").build().showDialog(gui);
-      if (serverIp == null)
-        return;
-      String userNumber = new TextInputDialogBuilder().setTitle("Seu Número")
+      String serverIp = "localhost";
+
+      // String serverIp = new TextInputDialogBuilder().setTitle("IP do Servidor")
+      // .setDescription("Digite o IP do servidor (ex:
+      // localhost)").build().showDialog(gui);
+      // if (serverIp == null)
+      // return;
+      userNumber = new TextInputDialogBuilder().setTitle("Seu Número")
           .setDescription("Digite seu número (ex: 101)")
           .setValidationPattern(Pattern.compile("[0-9]+"), "Apenas números").build().showDialog(gui);
       if (userNumber == null)
         return;
-      String userName = new TextInputDialogBuilder().setTitle("Seu Nome").setDescription("Digite seu nome (ex: Fulano)")
+      userName = new TextInputDialogBuilder().setTitle("Seu Nome").setDescription("Digite seu nome (ex: Fulano)")
           .build().showDialog(gui);
       if (userName == null)
         return;
@@ -65,28 +78,32 @@ public class Client {
   }
 
   private static void buildGui(String userName, String userNumber) {
-    BasicWindow window = new BasicWindow("Terminal Chat - Logado como " + userName + "(" + userNumber + ")");
+    BasicWindow window = new BasicWindow("Terminal Chat - " + userName + "(" + userNumber + ")");
     window.setHints(Arrays.asList(Window.Hint.EXPANDED));
 
-    Panel mainContentPanel = new Panel(new BorderLayout());
-    Panel topSectionPanel = new Panel(new GridLayout(2));
-    mainContentPanel.addComponent(topSectionPanel, BorderLayout.Location.CENTER);
-
-    Panel messagesPanel = new Panel();
-    messagesPanel.addComponent(new Label("MENSAGENS").withBorder(Borders.singleLine()));
-    messagesListBox = new ActionListBox(new TerminalSize(50, 20));
-    messagesPanel.addComponent(messagesListBox);
-    topSectionPanel.addComponent(messagesPanel.withBorder(Borders.singleLine()));
+    Panel mainPanel = new Panel(new GridLayout(2));
 
     Panel usersPanel = new Panel();
-    usersPanel.addComponent(new Label("USUÁRIOS ONLINE").withBorder(Borders.singleLine()));
     usersListBox = new ActionListBox(new TerminalSize(25, 20));
-    usersPanel.addComponent(usersListBox);
-    topSectionPanel.addComponent(usersPanel.withBorder(Borders.singleLine()));
+    usersPanel.addComponent(new Label("Conversas"));
+    usersPanel.addComponent(usersListBox.withBorder(Borders.singleLine()));
+    mainPanel.addComponent(usersPanel.withBorder(Borders.doubleLine()));
+
+    Panel chatPanel = new Panel(new LinearLayout());
+    mainPanel.addComponent(chatPanel.withBorder(Borders.doubleLine()));
+
+    messagesListBox = new ActionListBox(new TerminalSize(50, 15));
+
+    chatLabel = new Label("Mensagens");
+
+    Panel messageViewer = new Panel();
+    messageViewer.addComponent(chatLabel);
+    messageViewer.addComponent(messagesListBox.withBorder(Borders.singleLine()));
+    chatPanel.addComponent(messageViewer);
 
     Panel inputPanel = new Panel(new LinearLayout(Direction.HORIZONTAL));
-    mainContentPanel.addComponent(inputPanel, BorderLayout.Location.BOTTOM);
-    TextBox messageInput = new TextBox(new TerminalSize(60, 1));
+    chatPanel.addComponent(inputPanel, BorderLayout.Location.BOTTOM);
+    TextBox messageInput = new TextBox(new TerminalSize(50, 1));
     messageInput.setLayoutData(LinearLayout.createLayoutData(LinearLayout.Alignment.Fill));
     inputPanel.addComponent(messageInput);
 
@@ -96,31 +113,23 @@ public class Client {
       if (text.isEmpty())
         return;
 
-      if (text.startsWith("@")) {
-        // Para mensagens privadas, o servidor envia uma confirmação.
-        // Apenas enviamos a mensagem para o servidor.
-        String[] parts = text.split(" ", 2);
-        if (parts.length == 2) {
-          String targetNumber = parts[0].substring(1);
-          out.println("PRIVATE:" + targetNumber + ":" + parts[1]);
-        }
-      } else {
-        // Para broadcast, adicionamos a mensagem à nossa tela LOCALMENTE
-        // para um feedback instantâneo.
-        messagesListBox.addItem("[Você]: " + text, null);
-        // E também enviamos ao servidor para que os outros recebam.
+      if (selectedContactNumber == "-1") {
         out.println("BROADCAST:" + text);
+      } else {
+        out.println("PRIVATE:" + selectedContactNumber + ":" + text);
+        messagesListBox.addItem("[Você]: " + text, null);
       }
 
       // Limpa a caixa de texto após o envio
       messageInput.setText("");
       // Rola a lista para a última mensagem
       messagesListBox.setSelectedIndex(messagesListBox.getItemCount() - 1);
+
     });
     // #############################################################
     inputPanel.addComponent(sendButton);
 
-    window.setComponent(mainContentPanel);
+    window.setComponent(mainPanel);
     gui.addWindow(window);
   }
 
@@ -131,21 +140,64 @@ public class Client {
       this.in = in;
     }
 
+    private void updateContacts(String message) {
+
+      contacts.clear();
+
+      String[] users = message.substring(13).split(",");
+
+      for (String user : users) {
+
+        if (user.isEmpty())
+          continue;
+
+        String[] userInfo = user.split(":");
+
+        if (userInfo.length == 0)
+          continue;
+
+        if (userInfo[0] == userNumber)
+          continue;
+
+        contacts.put(userInfo[0], userInfo[1]);
+
+      }
+    }
+
+    private void updateUserList() {
+      usersListBox.clearItems();
+      usersListBox.addItem("Broadcast", null);
+
+      for (String key : contacts.keySet()) {
+        usersListBox.addItem(contacts.get(key),
+            () -> {
+              int selectedIndex = usersListBox.getSelectedIndex();
+
+              if (usersListBox.getSelectedIndex() == 0) {
+                selectedContactNumber = "-1"; // broadcast
+                return;
+              }
+
+              String contactKey = (String) contacts.keySet().toArray()[selectedIndex - 1];
+              selectedContactNumber = contactKey;
+              chatLabel.setText("Mensagem > " + contacts.get(contactKey));
+            });
+      }
+    }
+
     @Override
     public void run() {
+
       try {
         String serverMessage;
         while ((serverMessage = in.readLine()) != null) {
           final String msg = serverMessage;
+
           gui.getGUIThread().invokeLater(() -> {
+
             if (msg.startsWith("UPDATE_USERS:")) {
-              usersListBox.clearItems();
-              String[] users = msg.substring(13).split(",");
-              for (String user : users) {
-                if (!user.isEmpty()) {
-                  usersListBox.addItem(user, null);
-                }
-              }
+              updateContacts(msg);
+              updateUserList();
             } else {
               messagesListBox.addItem(msg, null);
               messagesListBox.setSelectedIndex(messagesListBox.getItemCount() - 1);

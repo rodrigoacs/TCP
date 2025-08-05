@@ -48,7 +48,7 @@ public class TerminalChat {
 
             // Painel de Usuários (à direita)
             Panel usersPanel = new Panel();
-            usersPanel.addComponent(new Label("USUÁRIOS").withBorder(Borders.singleLine()));
+            usersPanel.addComponent(new Label("USUARIOS").withBorder(Borders.singleLine()));
             ActionListBox usersListBox = new ActionListBox(new TerminalSize(20, 20));
             usersListBox.addItem("Fulano: Online", null);
             usersListBox.addItem("Ciclano: Online", null);
