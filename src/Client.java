@@ -13,6 +13,7 @@ import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Arrays;
+import java.util.Map;
 import java.util.HashMap;
 import java.util.regex.Pattern;
 
@@ -115,9 +116,9 @@ public class Client {
 
       if (selectedContactNumber == "-1") {
         out.println("BROADCAST:" + text);
+        messagesListBox.addItem("[Você]: " + text, null);
       } else {
         out.println("PRIVATE:" + selectedContactNumber + ":" + text);
-        messagesListBox.addItem("[Você]: " + text, null);
       }
 
       // Limpa a caixa de texto após o envio
@@ -143,6 +144,7 @@ public class Client {
     private void updateContacts(String message) {
 
       contacts.clear();
+      contacts.put("-1", "Broadcast");
 
       String[] users = message.substring(13).split(",");
 
@@ -156,7 +158,7 @@ public class Client {
         if (userInfo.length == 0)
           continue;
 
-        if (userInfo[0] == userNumber)
+        if (userInfo[0].equals(userNumber))
           continue;
 
         contacts.put(userInfo[0], userInfo[1]);
@@ -166,21 +168,12 @@ public class Client {
 
     private void updateUserList() {
       usersListBox.clearItems();
-      usersListBox.addItem("Broadcast", null);
 
       for (String key : contacts.keySet()) {
         usersListBox.addItem(contacts.get(key),
             () -> {
-              int selectedIndex = usersListBox.getSelectedIndex();
-
-              if (usersListBox.getSelectedIndex() == 0) {
-                selectedContactNumber = "-1"; // broadcast
-                return;
-              }
-
-              String contactKey = (String) contacts.keySet().toArray()[selectedIndex - 1];
-              selectedContactNumber = contactKey;
-              chatLabel.setText("Mensagem > " + contacts.get(contactKey));
+              selectedContactNumber = (String) contacts.keySet().toArray()[usersListBox.getSelectedIndex()];
+              chatLabel.setText("Mensagem > " + key);
             });
       }
     }
